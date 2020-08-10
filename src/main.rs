@@ -1,37 +1,52 @@
 #![deny(warnings)]
 
-use std::convert::Infallible;
-use std::str::FromStr;
-use std::time::Duration;
-use warp::Filter;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Client, Error, Server};
+use std::net::SocketAddr;
+
+mod waf;
 
 #[tokio::main]
 async fn main() {
-    // Match `/:Seconds`...
-    let routes = warp::path::param()
-        // and_then create a `Future` that will simply wait N seconds...
-        .and_then(sleepy);
+    pretty_env_logger::init();
 
-    warp::serve(routes).run(([0, 0, 0, 0], 3030)).await;
-}
+    let in_addr = ([127, 0, 0, 1], 3001).into();
+    let out_addr: SocketAddr = ([127, 0, 0, 1], 6699).into();
 
-async fn sleepy(Seconds(seconds): Seconds) -> Result<impl warp::Reply, Infallible> {
-    tokio::time::delay_for(Duration::from_secs(seconds)).await;
-    Ok(format!("I waited {} seconds!", seconds))
-}
+    let client_main = Client::new();
 
-/// A newtype to enforce our maximum allowed seconds.
-struct Seconds(u64);
+    let out_addr_clone = out_addr.clone();
 
-impl FromStr for Seconds {
-    type Err = ();
-    fn from_str(src: &str) -> Result<Self, Self::Err> {
-        src.parse::<u64>().map_err(|_| ()).and_then(|num| {
-            if num <= 5 {
-                Ok(Seconds(num))
-            } else {
-                Err(())
-            }
-        })
+    // The closure inside `make_service_fn` is run for each connection,
+    // creating a 'service' to handle requests for that specific connection.
+    let make_service = make_service_fn(move |_| {
+        let client = client_main.clone();
+
+        async move {
+            // This is the `Service` that will handle the connection.
+            // `service_fn` is a helper to convert a function that
+            // returns a Response into a `Service`.
+            Ok::<_, Error>(service_fn(move |mut req| {
+                println!("{:#?}", req);
+                waf::check(req);
+                let uri_string = format!(
+                    "http://{}/{}",
+                    out_addr_clone,
+                    req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("")
+                );
+                let uri = uri_string.parse().unwrap();
+                *req.uri_mut() = uri;
+                client.request(req)
+            }))
+        }
+    });
+
+    let server = Server::bind(&in_addr).serve(make_service);
+
+    println!("Listening on http://{}", in_addr);
+    println!("Proxying on http://{}", out_addr);
+
+    if let Err(e) = server.await {
+        eprintln!("server error: {}", e);
     }
 }
