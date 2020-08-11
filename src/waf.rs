@@ -12,7 +12,7 @@ macro_rules! regex {
     };
 }
 
-pub fn check(req: Request) {
+pub fn req_check<T>(req: &Request<T>) {
     let variants = vec![
         regex!("agggtaaa|tttaccct"),
         regex!("[cgt]gggtaaa|tttaccc[acg]"),
@@ -24,5 +24,9 @@ pub fn check(req: Request) {
         regex!("agggta[cgt]a|t[acg]taccct"),
         regex!("agggtaa[cgt]|[acg]ttaccct"),
     ];
-    println!("{:#?}", variants);
+
+    for variant in variants {
+        let a = variant.captures(req.uri().path());
+        println!("{:#?}", a);
+    }
 }

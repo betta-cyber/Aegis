@@ -1,4 +1,3 @@
-#![deny(warnings)]
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Client, Error, Server};
@@ -10,8 +9,8 @@ mod waf;
 async fn main() {
     pretty_env_logger::init();
 
-    let in_addr = ([127, 0, 0, 1], 3001).into();
-    let out_addr: SocketAddr = ([127, 0, 0, 1], 6699).into();
+    let in_addr = ([0, 0, 0, 0], 3001).into();
+    let out_addr: SocketAddr = ([127, 0, 0, 1], 9000).into();
 
     let client_main = Client::new();
 
@@ -27,8 +26,7 @@ async fn main() {
             // `service_fn` is a helper to convert a function that
             // returns a Response into a `Service`.
             Ok::<_, Error>(service_fn(move |mut req| {
-                println!("{:#?}", req);
-                waf::check(req);
+                waf::req_check(&req);
                 let uri_string = format!(
                     "http://{}/{}",
                     out_addr_clone,
