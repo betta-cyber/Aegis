@@ -22,11 +22,26 @@ pub fn req_check<T>(req: &Request<T>) {
         regex!("aggg[acg]aaa|ttt[cgt]ccct"),
         regex!("agggt[cgt]aa|tt[acg]accct"),
         regex!("agggta[cgt]a|t[acg]taccct"),
-        regex!("agggtaa[cgt]|[acg]ttaccct"),
+        regex!("([<＜]script[^>＞]*[>＞][\\s\\S]*?)"),
     ];
 
+    let query = req.uri().query().unwrap();
+
     for variant in variants {
-        let a = variant.captures(req.uri().path());
+        let a = variant.captures(query);
+        println!("{:#?}", a);
+    }
+}
+
+pub fn white_check<T>(req: &Request<T>) {
+    let variants = vec![
+        regex!("([<＜]script[^>＞]*[>＞][\\s\\S]*?)"),
+    ];
+
+    let query = req.uri().query().unwrap();
+
+    for variant in variants {
+        let a = variant.captures(query);
         println!("{:#?}", a);
     }
 }
